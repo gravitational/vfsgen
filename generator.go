@@ -3,6 +3,7 @@ package vfsgen
 import (
 	"bytes"
 	"fmt"
+	"go/format"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -45,9 +46,14 @@ func Generate(input http.FileSystem, opt Options) error {
 		return err
 	}
 
+	out := buf.Bytes()
+	if fmtOut, err := format.Source(buf.Bytes()); err == nil {
+		out = fmtOut
+	}
+
 	// Write output file (all at once).
 	fmt.Println("writing", opt.Filename)
-	err = ioutil.WriteFile(opt.Filename, buf.Bytes(), 0644)
+	err = ioutil.WriteFile(opt.Filename, out, 0644)
 	return err
 }
 
