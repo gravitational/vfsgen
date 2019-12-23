@@ -191,7 +191,7 @@ var {{.VariableName}} = func() http.FileSystem {
 {{define "FileInfo-Before"}}		{{quote .Path}}: &vfsgen۰FileInfo{
 			name:    {{quote .Name}},
 			modTime: {{template "Time" .ModTime}},
-			content: []byte({{end}}{{define "FileInfo-After"}}),
+			content: []byte{ {{- end}}{{define "FileInfo-After" -}} },
 		},
 {{end}}
 
