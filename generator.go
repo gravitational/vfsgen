@@ -145,8 +145,8 @@ func writeFileInfo(w io.Writer, file *fileInfo, r io.Reader) error {
 	if err != nil {
 		return err
 	}
-	sw := &stringWriter{Writer: w}
-	_, err = io.Copy(sw, r)
+	bw := &byteWriter{w: w}
+	_, err = io.Copy(bw, r)
 	if err != nil {
 		return err
 	}
@@ -227,12 +227,7 @@ func (fs vfsgen۰FS) Open(path string) (http.File, error) {
 		return nil, &os.PathError{Op: "open", Path: path, Err: os.ErrNotExist}
 	}
 
-	switch f := f.(type) {{"{"}}{{if .HasCompressedFile}}
-	case *vfsgen۰FileInfo:
-		return &vfsgen۰File{
-			vfsgen۰FileInfo: f,
-			Reader:          bytes.NewReader(f.content),
-		}, nil{{end}}
+	switch f := f.(type) {{"{"}}
 	case *vfsgen۰DirInfo:
 		return &vfsgen۰Dir{
 			vfsgen۰DirInfo: f,
