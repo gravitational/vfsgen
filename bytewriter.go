@@ -14,15 +14,19 @@ type byteWriter struct {
 
 func (r *byteWriter) Write(p []byte) (n int, err error) {
 	for len(p) > 0 {
-		n := 16
-		if n > len(p) {
-			n = len(p)
+		s := 16
+		if s > len(p) {
+			s = len(p)
 		}
-		for _, c := range p[:n] {
+		for _, c := range p[:s] {
 			//noerrcheck
-			_, _ = fmt.Fprintf(r.w, "0x%02x,", c)
+			_, err = fmt.Fprintf(r.w, "0x%02x,", c)
+			if err != nil {
+				return n, err
+			}
 		}
-		p = p[n:]
+		n += s
+		p = p[s:]
 	}
 	return n, nil
 }
