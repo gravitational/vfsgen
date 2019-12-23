@@ -2,8 +2,6 @@ package vfsgen
 
 import (
 	"bytes"
-	"compress/gzip"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -55,17 +53,14 @@ func Generate(input http.FileSystem, opt Options) error {
 
 type toc struct {
 	dirs []*dirInfo
-
-	HasCompressedFile bool // There's at least one compressedFile.
-	HasFile           bool // There's at least one uncompressed file.
 }
 
 // fileInfo is a definition of a file.
 type fileInfo struct {
-	Path             string
-	Name             string
-	ModTime          time.Time
-	UncompressedSize int64
+	Path    string
+	Name    string
+	ModTime time.Time
+	Size    int64
 }
 
 // dirInfo is a definition of a directory.
@@ -89,36 +84,16 @@ func findAndWriteFiles(buf *bytes.Buffer, fs http.FileSystem, toc *toc) error {
 		switch fi.IsDir() {
 		case false:
 			file := &fileInfo{
-				Path:             path,
-				Name:             pathpkg.Base(path),
-				ModTime:          fi.ModTime().UTC(),
-				UncompressedSize: fi.Size(),
+				Path:    path,
+				Name:    pathpkg.Base(path),
+				ModTime: fi.ModTime().UTC(),
+				Size:    fi.Size(),
 			}
 
-			marker := buf.Len()
-
-			// Write CompressedFileInfo.
-			err = writeCompressedFileInfo(buf, file, r)
-			switch err {
-			default:
+			// Write FileInfo.
+			err = writeFileInfo(buf, file, r)
+			if err != nil {
 				return err
-			case nil:
-				toc.HasCompressedFile = true
-			// If compressed file is not smaller than original, revert and write original file.
-			case errCompressedNotSmaller:
-				_, err = r.Seek(0, io.SeekStart)
-				if err != nil {
-					return err
-				}
-
-				buf.Truncate(marker)
-
-				// Write FileInfo.
-				err = writeFileInfo(buf, file, r)
-				if err != nil {
-					return err
-				}
-				toc.HasFile = true
 			}
 		case true:
 			entries, err := readDirPaths(fs, path)
@@ -164,32 +139,6 @@ func readDirPaths(fs http.FileSystem, dirname string) ([]string, error) {
 	return paths, nil
 }
 
-// writeCompressedFileInfo writes CompressedFileInfo.
-// It returns errCompressedNotSmaller if compressed file is not smaller than original.
-func writeCompressedFileInfo(w io.Writer, file *fileInfo, r io.Reader) error {
-	err := t.ExecuteTemplate(w, "CompressedFileInfo-Before", file)
-	if err != nil {
-		return err
-	}
-	sw := &stringWriter{Writer: w}
-	gw := gzip.NewWriter(sw)
-	_, err = io.Copy(gw, r)
-	if err != nil {
-		return err
-	}
-	err = gw.Close()
-	if err != nil {
-		return err
-	}
-	if sw.N >= file.UncompressedSize {
-		return errCompressedNotSmaller
-	}
-	err = t.ExecuteTemplate(w, "CompressedFileInfo-After", file)
-	return err
-}
-
-var errCompressedNotSmaller = errors.New("compressed file is not smaller than original")
-
 // Write FileInfo.
 func writeFileInfo(w io.Writer, file *fileInfo, r io.Reader) error {
 	err := t.ExecuteTemplate(w, "FileInfo-Before", file)
@@ -225,7 +174,6 @@ var t = template.Must(template.New("").Funcs(template.FuncMap{
 
 import (
 	"bytes"
-	"compress/gzip"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -239,18 +187,6 @@ import (
 var {{.VariableName}} = func() http.FileSystem {
 	fs := vfsgen۰FS{
 {{end}}
-
-
-
-{{define "CompressedFileInfo-Before"}}		{{quote .Path}}: &vfsgen۰CompressedFileInfo{
-			name:             {{quote .Name}},
-			modTime:          {{template "Time" .ModTime}},
-			uncompressedSize: {{.UncompressedSize}},
-{{/* This blank line separating compressedContent is neccessary to prevent potential gofmt issues. See issue #19. */}}
-			compressedContent: []byte("{{end}}{{define "CompressedFileInfo-After"}}"),
-		},
-{{end}}
-
 
 
 {{define "FileInfo-Before"}}		{{quote .Path}}: &vfsgen۰FileInfo{
@@ -292,16 +228,6 @@ func (fs vfsgen۰FS) Open(path string) (http.File, error) {
 	}
 
 	switch f := f.(type) {{"{"}}{{if .HasCompressedFile}}
-	case *vfsgen۰CompressedFileInfo:
-		gr, err := gzip.NewReader(bytes.NewReader(f.compressedContent))
-		if err != nil {
-			// This should never happen because we generate the gzip bytes such that they are always valid.
-			panic("unexpected error reading own gzip compressed bytes: " + err.Error())
-		}
-		return &vfsgen۰CompressedFile{
-			vfsgen۰CompressedFileInfo: f,
-			gr:                        gr,
-		}, nil{{end}}{{if .HasFile}}
 	case *vfsgen۰FileInfo:
 		return &vfsgen۰File{
 			vfsgen۰FileInfo: f,
@@ -316,83 +242,8 @@ func (fs vfsgen۰FS) Open(path string) (http.File, error) {
 		panic(fmt.Sprintf("unexpected type %T", f))
 	}
 }
-{{if .HasCompressedFile}}
-// vfsgen۰CompressedFileInfo is a static definition of a gzip compressed file.
-type vfsgen۰CompressedFileInfo struct {
-	name              string
-	modTime           time.Time
-	compressedContent []byte
-	uncompressedSize  int64
-}
 
-func (f *vfsgen۰CompressedFileInfo) Readdir(count int) ([]os.FileInfo, error) {
-	return nil, fmt.Errorf("cannot Readdir from file %s", f.name)
-}
-func (f *vfsgen۰CompressedFileInfo) Stat() (os.FileInfo, error) { return f, nil }
-
-func (f *vfsgen۰CompressedFileInfo) GzipBytes() []byte {
-	return f.compressedContent
-}
-
-func (f *vfsgen۰CompressedFileInfo) Name() string       { return f.name }
-func (f *vfsgen۰CompressedFileInfo) Size() int64        { return f.uncompressedSize }
-func (f *vfsgen۰CompressedFileInfo) Mode() os.FileMode  { return 0444 }
-func (f *vfsgen۰CompressedFileInfo) ModTime() time.Time { return f.modTime }
-func (f *vfsgen۰CompressedFileInfo) IsDir() bool        { return false }
-func (f *vfsgen۰CompressedFileInfo) Sys() interface{}   { return nil }
-
-// vfsgen۰CompressedFile is an opened compressedFile instance.
-type vfsgen۰CompressedFile struct {
-	*vfsgen۰CompressedFileInfo
-	gr      *gzip.Reader
-	grPos   int64 // Actual gr uncompressed position.
-	seekPos int64 // Seek uncompressed position.
-}
-
-func (f *vfsgen۰CompressedFile) Read(p []byte) (n int, err error) {
-	if f.grPos > f.seekPos {
-		// Rewind to beginning.
-		err = f.gr.Reset(bytes.NewReader(f.compressedContent))
-		if err != nil {
-			return 0, err
-		}
-		f.grPos = 0
-	}
-	if f.grPos < f.seekPos {
-		// Fast-forward.
-		_, err = io.CopyN(ioutil.Discard, f.gr, f.seekPos-f.grPos)
-		if err != nil {
-			return 0, err
-		}
-		f.grPos = f.seekPos
-	}
-	n, err = f.gr.Read(p)
-	f.grPos += int64(n)
-	f.seekPos = f.grPos
-	return n, err
-}
-func (f *vfsgen۰CompressedFile) Seek(offset int64, whence int) (int64, error) {
-	switch whence {
-	case io.SeekStart:
-		f.seekPos = 0 + offset
-	case io.SeekCurrent:
-		f.seekPos += offset
-	case io.SeekEnd:
-		f.seekPos = f.uncompressedSize + offset
-	default:
-		panic(fmt.Errorf("invalid whence value: %v", whence))
-	}
-	return f.seekPos, nil
-}
-func (f *vfsgen۰CompressedFile) Close() error {
-	return f.gr.Close()
-}
-{{else}}
-// We already imported "compress/gzip" and "io/ioutil", but ended up not using them. Avoid unused import error.
-var _ = gzip.Reader{}
-var _ = ioutil.Discard
-{{end}}{{if .HasFile}}
-// vfsgen۰FileInfo is a static definition of an uncompressed file (because it's not worth gzip compressing).
+// vfsgen۰FileInfo is a static definition of a file.
 type vfsgen۰FileInfo struct {
 	name    string
 	modTime time.Time
@@ -422,10 +273,7 @@ type vfsgen۰File struct {
 func (f *vfsgen۰File) Close() error {
 	return nil
 }
-{{else if not .HasCompressedFile}}
-// We already imported "bytes", but ended up not using it. Avoid unused import error.
-var _ = bytes.Reader{}
-{{end}}
+
 // vfsgen۰DirInfo is a static definition of a directory.
 type vfsgen۰DirInfo struct {
 	name    string
