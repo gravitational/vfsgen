@@ -3,14 +3,14 @@ package vfsgen
 import (
 	"fmt"
 	"io"
+	"strings"
 )
 
 // byteWriter encodes the input as a []byte literal.
-// It tracks the total number of bytes written.
 type byteWriter struct {
-	w   io.Writer
-	err error
-	N   int64 // Total bytes written.
+	w     io.Writer
+	ntabs int
+	err   error
 }
 
 func (r *byteWriter) Write(p []byte) (n int, err error) {
@@ -19,14 +19,28 @@ func (r *byteWriter) Write(p []byte) (n int, err error) {
 		if s > len(p) {
 			s = len(p)
 		}
-		for _, c := range p[:s] {
-			r.write(c)
+		r.indent()
+		r.write(p[0])
+		if s > 1 {
+			for _, c := range p[1:s] {
+				r.writeAdditional(c)
+			}
 		}
-		r.writeEol()
+		if len(p) > 0 && s == 16 {
+			r.writeEol()
+		}
 		n += s
 		p = p[s:]
 	}
 	return n, r.err
+}
+
+func (r *byteWriter) indent() error {
+	if r.err != nil {
+		return r.err
+	}
+	_, r.err = fmt.Fprint(r.w, strings.Repeat("\t", r.ntabs))
+	return r.err
 }
 
 func (r *byteWriter) write(c byte) error {
@@ -34,6 +48,14 @@ func (r *byteWriter) write(c byte) error {
 		return r.err
 	}
 	_, r.err = fmt.Fprintf(r.w, "0x%02x,", c)
+	return r.err
+}
+
+func (r *byteWriter) writeAdditional(c byte) error {
+	if r.err != nil {
+		return r.err
+	}
+	_, r.err = fmt.Fprintf(r.w, " 0x%02x,", c)
 	return r.err
 }
 

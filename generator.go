@@ -3,7 +3,6 @@ package vfsgen
 import (
 	"bytes"
 	"fmt"
-	"go/format"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -46,14 +45,9 @@ func Generate(input http.FileSystem, opt Options) error {
 		return err
 	}
 
-	out := buf.Bytes()
-	if fmtOut, err := format.Source(buf.Bytes()); err == nil {
-		out = fmtOut
-	}
-
 	// Write output file (all at once).
 	fmt.Println("writing", opt.Filename)
-	err = ioutil.WriteFile(opt.Filename, out, 0644)
+	err = ioutil.WriteFile(opt.Filename, buf.Bytes(), 0644)
 	return err
 }
 
@@ -151,7 +145,7 @@ func writeFileInfo(w io.Writer, file *fileInfo, r io.Reader) error {
 	if err != nil {
 		return err
 	}
-	bw := &byteWriter{w: w}
+	bw := &byteWriter{w: w, ntabs: 4}
 	_, err = io.Copy(bw, r)
 	if err != nil {
 		return err
@@ -197,7 +191,9 @@ var {{.VariableName}} = func() http.FileSystem {
 {{define "FileInfo-Before"}}		{{quote .Path}}: &vfsgen۰FileInfo{
 			name:    {{quote .Name}},
 			modTime: {{template "Time" .ModTime}},
-			content: []byte{ {{- end}}{{define "FileInfo-After" -}} },
+			content: []byte{
+{{end}}{{define "FileInfo-After"}}
+			},
 		},
 {{end}}
 
