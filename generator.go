@@ -228,7 +228,12 @@ func (fs vfsgen۰FS) Open(path string) (http.File, error) {
 		return nil, &os.PathError{Op: "open", Path: path, Err: os.ErrNotExist}
 	}
 
-	switch f := f.(type) {{"{"}}
+	switch f := f.(type) {
+	case *vfsgen۰FileInfo:
+		return &vfsgen۰File{
+			vfsgen۰FileInfo: f,
+			Reader:          bytes.NewReader(f.content),
+		}, nil
 	case *vfsgen۰DirInfo:
 		return &vfsgen۰Dir{
 			vfsgen۰DirInfo: f,

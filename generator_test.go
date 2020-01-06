@@ -71,7 +71,7 @@ func TestGenerate_buildAndGofmt(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests[2:] {
+	for _, test := range tests {
 		filename := filepath.Join(tempDir, test.filename)
 
 		err := vfsgen.Generate(test.fs, vfsgen.Options{
