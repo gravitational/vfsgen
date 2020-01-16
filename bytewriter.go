@@ -7,6 +7,7 @@ import (
 )
 
 // byteWriter encodes the input as a []byte literal.
+// It outputs the byte slice as gofmt would format it without requiring gofmt.
 type byteWriter struct {
 	w     io.Writer
 	ntabs int
@@ -14,23 +15,27 @@ type byteWriter struct {
 }
 
 func (r *byteWriter) Write(p []byte) (n int, err error) {
+	const numBytesInRow = 16
 	for len(p) > 0 {
-		s := 16
-		if s > len(p) {
-			s = len(p)
+		numBytes := numBytesInRow
+		if numBytes > len(p) {
+			// Write the rest of bytes
+			numBytes = len(p)
 		}
 		r.indent()
 		r.write(p[0])
-		if s > 1 {
-			for _, c := range p[1:s] {
+		// Have any bytes to output?
+		if numBytes > 1 {
+			for _, c := range p[1:numBytes] {
 				r.writeAdditional(c)
 			}
 		}
-		if len(p) > 0 && s == 16 {
-			r.writeEol()
+		if numBytes == numBytesInRow {
+			// Start a new line
+			r.writeEOL()
 		}
-		n += s
-		p = p[s:]
+		n += numBytes
+		p = p[numBytes:]
 	}
 	return n, r.err
 }
@@ -59,7 +64,7 @@ func (r *byteWriter) writeAdditional(c byte) error {
 	return r.err
 }
 
-func (r *byteWriter) writeEol() error {
+func (r *byteWriter) writeEOL() error {
 	if r.err != nil {
 		return r.err
 	}
