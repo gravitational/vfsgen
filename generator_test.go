@@ -7,11 +7,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 
+	"github.com/gravitational/vfsgen"
+
 	"github.com/shurcooL/httpfs/union"
-	"github.com/shurcooL/vfsgen"
 	"golang.org/x/tools/godoc/vfs/httpfs"
 	"golang.org/x/tools/godoc/vfs/mapfs"
 )
@@ -67,21 +67,6 @@ func TestGenerate_buildAndGofmt(t *testing.T) {
 			filename: "nocompressed.go",
 			fs: httpfs.New(mapfs.New(map[string]string{
 				"not-compressable-file.txt": "Not compressable.",
-			})),
-		},
-		{
-			// Only compressed files.
-			filename: "onlycompressed.go",
-			fs: httpfs.New(mapfs.New(map[string]string{
-				"compressable-file.txt": "This text compresses easily. " + strings.Repeat(" Go!", 128),
-			})),
-		},
-		{
-			// Both non-compressed and compressed files.
-			filename: "both.go",
-			fs: httpfs.New(mapfs.New(map[string]string{
-				"not-compressable-file.txt": "Not compressable.",
-				"compressable-file.txt":     "This text compresses easily. " + strings.Repeat(" Go!", 128),
 			})),
 		},
 	}
