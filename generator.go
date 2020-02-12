@@ -256,8 +256,6 @@ func (f *vfsgen۰FileInfo) Readdir(count int) ([]os.FileInfo, error) {
 }
 func (f *vfsgen۰FileInfo) Stat() (os.FileInfo, error) { return f, nil }
 
-func (f *vfsgen۰FileInfo) NotWorthGzipCompressing() {}
-
 func (f *vfsgen۰FileInfo) Name() string       { return f.name }
 func (f *vfsgen۰FileInfo) Size() int64        { return int64(len(f.content)) }
 func (f *vfsgen۰FileInfo) Mode() os.FileMode  { return 0444 }
